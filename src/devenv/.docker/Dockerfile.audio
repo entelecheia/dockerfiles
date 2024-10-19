@@ -1,0 +1,147 @@
+# Sets the base image for subsequent instructions
+ARG ARG_BUILD_FROM="nvcr.io/nvidia/pytorch:23.02-py3"
+FROM $ARG_BUILD_FROM
+
+# Setting this argument prevents interactive prompts during the build process
+ENV DEBIAN_FRONTEND=noninteractive
+#
+# install prerequisites
+#
+RUN apt-get install --yes -qq --no-install-recommends ca-certificates
+RUN apt-get update && \
+    apt-get install --yes -qq --no-install-recommends \
+        ca-certificates curl wget gnupg \
+        sudo software-properties-common zsh locales locales-all \
+        jq gettext autoconf apt-transport-https zip bzip2 unzip \
+        fontconfig fonts-nanum tzdata python3-venv \
+        google-perftools libcairo2-dev imagemagick ffmpeg openssh-server \
+    # Cleans up unnecessary packages to reduce image size
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Sets up the locale to en_US.UTF-8
+RUN locale-gen en_US en_US.UTF-8 && \
+    dpkg-reconfigure locales && \
+    localedef -v -c -i en_US -f UTF-8 en_US.UTF-8 || true
+# Fixes sudo error related to core dumps
+RUN echo "Set disable_coredump false" > /etc/sudo.conf
+
+#
+# install prerequisites for python
+#
+RUN pip3 install --no-cache-dir setuptools Cython wheel
+RUN pip3 install --no-cache-dir --verbose numpy
+RUN pip3 install --no-cache-dir --verbose onnx
+
+#
+# torchaudio
+#
+ARG ARG_TORCHAUDIO_VERSION=v2.0.2
+ENV TORCHAUDIO_VERSION $ARG_TORCHAUDIO_VERSION
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+		  pkg-config \
+		  libffi-dev \
+		  libsndfile1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+RUN pip3 install --no-cache-dir scikit-build && \
+    pip3 install --no-cache-dir ninja && \
+    pip3 install --no-cache-dir --verbose pysoundfile
+
+# note:  see https://github.com/pytorch/audio/issues/2295 for the reason for the sed commands
+RUN git clone --recursive -b ${TORCHAUDIO_VERSION} https://github.com/pytorch/audio torchaudio && \
+    cd torchaudio && \
+    sed -i 's#  URL https://zlib.net/zlib-1.2.11.tar.gz#  URL https://zlib.net/zlib-1.2.12.tar.gz#g' third_party/zlib/CMakeLists.txt || echo "failed to patch torchaudio/third_party/zlib/CMakeLists.txt" && \
+    sed -i 's#  URL_HASH SHA256=c3e5e9fdd5004dcb542feda5ee4f0ff0744628baf8ed2dd5d66f8ca1197cb1a1#  URL_HASH SHA256=91844808532e5ce316b3c010929493c0244f3d37593afd6de04f71821d5136d9#g' third_party/zlib/CMakeLists.txt || echo "failed to patch torchaudio/third_party/zlib/CMakeLists.txt" && \
+    BUILD_SOX=1 python3 setup.py install && \
+    cd ../ && \
+    rm -rf torchaudio
+
+#
+# install git from ppa to support the latest functionality
+#
+RUN add-apt-repository ppa:git-core/ppa --yes && \
+    apt-get update --yes && \
+    apt-get install --yes -qq --no-install-recommends git
+#
+# install apt packages that require other sources than the default
+#
+RUN sh -c "$(wget -qO- https://dotfiles.entelecheia.ai/install-apt-pkgs)"
+
+#
+# user setup
+#
+# Setting ARGs and ENVs for user creation and workspace setup
+ARG ARG_USERNAME="app"
+ARG ARG_USER_UID=1000
+ARG ARG_USER_GID=$ARG_USER_UID
+ARG ARG_WORKSPACE_ROOT="/workspace"
+ENV USERNAME $ARG_USERNAME
+ENV USER_UID $ARG_USER_UID
+ENV USER_GID $ARG_USER_GID
+ENV WORKSPACE_ROOT $ARG_WORKSPACE_ROOT
+
+# Creates a non-root user with sudo privileges
+RUN groupadd --gid $USER_GID $USERNAME \
+    && adduser --uid $USER_UID --gid $USER_GID --force-badname --disabled-password --gecos "" $USERNAME  \
+    && echo "$USERNAME:$USERNAME" | chpasswd \
+    && adduser $USERNAME sudo \
+    && echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers \
+    && echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/$USERNAME \
+    && chmod 0440 /etc/sudoers.d/$USERNAME
+
+# Switches to the newly created user
+USER $USERNAME
+# Sets up the workspace for the user
+RUN sudo rm -rf $WORKSPACE_ROOT && sudo mkdir -p $WORKSPACE_ROOT/projects
+RUN sudo chown -R $USERNAME:$USERNAME $WORKSPACE_ROOT
+
+#
+# Install dotfiles
+#
+ARG ARG_USER_FULLNAME
+ARG ARG_USER_EMAIL
+ARG ARG_GITHUB_USERNAME
+ARG ARG_SYSTEM_HOSTNAME
+ARG ARG_WORKSPACE_LOCATION="/"
+ARG ARG_DOTFILES_VERSION="0.1.0"
+ENV USER_FULLNAME $ARG_USER_FULLNAME
+ENV USER_EMAIL $ARG_USER_EMAIL
+ENV GITHUB_USERNAME $ARG_GITHUB_USERNAME
+ENV SYSTEM_HOSTNAME $ARG_SYSTEM_HOSTNAME
+ENV WORKSPACE_LOCATION $ARG_WORKSPACE_LOCATION
+ENV DOTFILES_VERSION $ARG_DOTFILES_VERSION
+
+ENV DOTFILES_APPLY_ROOTMOI=0
+ENV DOTFILES_USE_CODE=1
+ENV DOTFILES_USE_PYTHON_TOOLS=0
+ENV DOTFILES_MINIMUM=1
+ENV REMOTE_CONTAINERS=1
+
+#
+# Setup python environment
+#
+# https://docs.python.org/3/using/cmdline.html#envvar-PYTHONFAULTHANDLER
+ENV PYTHONFAULTHANDLER=1
+# https://docs.python.org/3/using/cmdline.html#envvar-PYTHONHASHSEED
+ENV PYTHONHASHSEED=random
+# https://docs.python.org/3/using/cmdline.html#envvar-PYTHONUNBUFFERED
+ENV PYTHONUNBUFFERED=1
+ENV PIP_DEFAULT_TIMEOUT=100
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+ENV PIP_NO_CACHE_DIR=1
+ENV POETRY_VIRTUALENVS_CREATE=false
+RUN sudo pip install --upgrade pip setuptools wheel
+
+# Sets the working directory to workspace root
+WORKDIR $WORKSPACE_ROOT
+# Copies scripts from host into the image
+COPY ./.docker/scripts/ ./scripts/
+
+# Sets the time zone within the container
+ENV TZ=Asia/Seoul
+
+CMD ["zsh"]

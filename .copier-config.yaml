@@ -1,0 +1,31 @@
+# Changes here will be overwritten by Copier; do NOT edit manually
+_commit: v0.6.0
+_src_path: gh:entelecheia/hyperfast-python-template
+author: Young Joon Lee
+build_and_release: false
+code_template_answers_file: ''
+code_template_source: None
+copyright_year: 2023
+documentaion_tool: mkdocs
+documentation_url: https://dockerfiles.entelecheia.ai
+email: entelecheia@hotmail.com
+favicon_path: https://assets.entelecheia.ai/favicon.png
+friendly_name: Dockerfiles
+github_repo_name: dockerfiles
+github_username: entelecheia
+google_analytics_id: G-VMN7QWCMSV
+logo_path: https://assets.entelecheia.ai/logo.png
+package_name: dockerfiles
+project_description: This repository contains Dockerfiles for various projects. Fork
+    this repository to create your own Dockerfiles. There are a few helper scripts
+    that can be used to simplify the process of building and running Docker containers.
+    These scripts are installed in the process of setting up dotfiles and can be found
+    in the .local/bin directory.
+project_license: MIT
+project_name: dockerfiles
+project_short_description: Dockerfiles for various projects
+upload_to_release: false
+upload_to_repository: false
+use_launch_buttons: false
+use_source_code_skeleton: false
+

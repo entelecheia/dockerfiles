@@ -1,0 +1,28 @@
+ARG BUILD_FROM="sonoisa/deep-learning-coding:pytorch1.12.0_tensorflow2.9.1"
+FROM $BUILD_FROM
+
+ARG DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Seoul
+
+RUN sudo apt-get update \
+    && sudo apt-get install -y fontconfig fonts-nanum tzdata locales \
+    && sudo apt-get clean \
+    && sudo rm -rf /var/lib/apt/lists/*
+
+# install dotfiles
+ARG USER_FULLNAME=""
+ARG USER_EMAIL=""
+ARG GITHUB_USERNAME=""
+ARG SYSTEM_HOSTNANE="devcon-arm64"
+
+ENV USER_FULLNAME=$USER_FULLNAME
+ENV USER_EMAIL=$USER_EMAIL
+ENV GITHUB_USERNAME=$GITHUB_USERNAME
+ENV SYSTEM_HOSTNAME=$SYSTEM_HOSTNAME
+ENV WORKSPACE_LOCATION="/"
+ENV DOTFILES_APPLY_ROOTMOI=0
+ENV REMOTE_CONTAINERS=1
+
+RUN sh -c "$(wget -qO- https://bit.ly/3W2JGyL)"
+
+CMD ["zsh"]

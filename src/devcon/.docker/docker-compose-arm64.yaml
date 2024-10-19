@@ -1,0 +1,29 @@
+version: '3'
+
+services:
+  arm64:
+    build:
+      context: .
+      dockerfile: .docker/Dockerfile.arm64
+      args:
+        BUILD_FROM: $BUILD_FROM
+        USER_FULLNAME: $USER_FULLNAME
+        USER_EMAIL: $USER_EMAIL
+        GITHUB_USERNAME: $GITHUB_USERNAME
+        WORKSPACE_LOCATION: $WORKSPACE_LOCATION
+        SYSTEM_HOSTNAME: $SYSTEM_HOSTNAME
+    image: $IMAGE_NAME
+    container_name: $CONTAINER_NAME
+    env_file:
+      - .env
+    ulimits:
+      stack: 67108864
+      memlock: -1
+    ports:
+      - "$HOST_SSH_PORT:22"
+    volumes:
+        - $WORKSPACE_ROOT:$CONTAINER_WORKSPACE_ROOT
+networks:
+  default:
+    name: $DOCKER_NETWORK_NAME
+    external: true

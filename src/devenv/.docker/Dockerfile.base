@@ -1,0 +1,89 @@
+# Sets the base image for subsequent instructions
+ARG ARG_BUILD_FROM="nvcr.io/nvidia/pytorch:23.02-py3"
+FROM $ARG_BUILD_FROM
+
+# Setting this argument prevents interactive prompts during the build process
+ENV DEBIAN_FRONTEND=noninteractive
+RUN sh -c "$(wget -qO- https://dotfiles.entelecheia.ai/install-apt-prerequisites)"
+RUN sh -c "$(wget -qO- https://dotfiles.entelecheia.ai/install-apt-pkgs)"
+# Updates the image and installs necessary packages
+RUN apt-get install -y --fix-missing \
+    fontconfig fonts-nanum tzdata python3-venv \
+    google-perftools libcairo2-dev imagemagick ffmpeg openssh-server \
+    # Cleans up unnecessary packages to reduce image size
+    && apt-get autoremove -y \
+    && apt-get clean -y
+
+
+# Sets up the locale to en_US.UTF-8
+RUN localedef -v -c -i en_US -f UTF-8 en_US.UTF-8 || true
+# Fixes sudo error related to core dumps
+RUN echo "Set disable_coredump false" > /etc/sudo.conf
+
+# Setting ARGs and ENVs for user creation and workspace setup
+ARG ARG_USERNAME="app"
+ARG ARG_USER_UID=1000
+ARG ARG_USER_GID=$ARG_USER_UID
+ARG ARG_WORKSPACE_ROOT="/workspace"
+ENV USERNAME $ARG_USERNAME
+ENV USER_UID $ARG_USER_UID
+ENV USER_GID $ARG_USER_GID
+ENV WORKSPACE_ROOT $ARG_WORKSPACE_ROOT
+
+# Creates a non-root user with sudo privileges
+RUN groupadd --gid $USER_GID $USERNAME \
+    && adduser --uid $USER_UID --gid $USER_GID --force-badname --disabled-password --gecos "" $USERNAME  \
+    && echo "$USERNAME:$USERNAME" | chpasswd \
+    && adduser $USERNAME sudo \
+    && echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers \
+    && echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/$USERNAME \
+    && chmod 0440 /etc/sudoers.d/$USERNAME
+
+# Switches to the newly created user
+USER $USERNAME
+# Sets up the workspace for the user
+RUN sudo rm -rf $WORKSPACE_ROOT && sudo mkdir -p $WORKSPACE_ROOT/projects
+RUN sudo chown -R $USERNAME:$USERNAME $WORKSPACE_ROOT
+
+# Install dotfiles
+ARG ARG_USER_FULLNAME
+ARG ARG_USER_EMAIL
+ARG ARG_GITHUB_USERNAME
+ARG ARG_SYSTEM_HOSTNAME
+ARG ARG_WORKSPACE_LOCATION="/"
+ARG ARG_DOTFILES_VERSION="0.1.0"
+ENV USER_FULLNAME $ARG_USER_FULLNAME
+ENV USER_EMAIL $ARG_USER_EMAIL
+ENV GITHUB_USERNAME $ARG_GITHUB_USERNAME
+ENV SYSTEM_HOSTNAME $ARG_SYSTEM_HOSTNAME
+ENV WORKSPACE_LOCATION $ARG_WORKSPACE_LOCATION
+ENV DOTFILES_VERSION $ARG_DOTFILES_VERSION
+
+ENV DOTFILES_APPLY_ROOTMOI=0
+ENV DOTFILES_USE_CODE=1
+ENV DOTFILES_USE_PYTHON_TOOLS=0
+ENV DOTFILES_MINIMUM=1
+ENV REMOTE_CONTAINERS=1
+
+# Setup python environment
+# https://docs.python.org/3/using/cmdline.html#envvar-PYTHONFAULTHANDLER
+ENV PYTHONFAULTHANDLER=1
+# https://docs.python.org/3/using/cmdline.html#envvar-PYTHONHASHSEED
+ENV PYTHONHASHSEED=random
+# https://docs.python.org/3/using/cmdline.html#envvar-PYTHONUNBUFFERED
+ENV PYTHONUNBUFFERED=1
+ENV PIP_DEFAULT_TIMEOUT=100
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+ENV PIP_NO_CACHE_DIR=1
+ENV POETRY_VIRTUALENVS_CREATE=false
+RUN sudo pip install --upgrade pip setuptools wheel
+
+# Sets the working directory to workspace root
+WORKDIR $WORKSPACE_ROOT
+# Copies scripts from host into the image
+COPY ./.docker/scripts/ ./scripts/
+
+# Sets the time zone within the container
+ENV TZ=Asia/Seoul
+
+CMD ["zsh"]
