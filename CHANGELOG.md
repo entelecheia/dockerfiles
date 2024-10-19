@@ -1,5 +1,17 @@
 <!--next-version-placeholder-->
 
+## v0.1.0 (2024-10-19)
+
+### Feature
+
+* Update copier configuration and enhance project setup ([`5c69f8d`](https://github.com/entelecheia/dockerfiles/commit/5c69f8d17eabb349d67518ef9c6da311977e30c9))
+* Add initial project structure and configuration files ([`409293c`](https://github.com/entelecheia/dockerfiles/commit/409293ccb612c39a932d48f741b43c2000f520bf))
+
+### Fix
+
+* Update Python version requirement to 3.9 and dependencies in pyproject.toml ([`2bf9903`](https://github.com/entelecheia/dockerfiles/commit/2bf9903fa3e182e1ba3c6767c88fa6bb722516aa))
+* Update Python version in release workflow to 3.9 ([`d283c2c`](https://github.com/entelecheia/dockerfiles/commit/d283c2c11a211d34c476689bd850be6ce9f6e86c))
+
 ## v0.9.0 (2023-06-08)
 
 ### Feature
